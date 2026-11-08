@@ -1,0 +1,7 @@
+# DSH 学术数据工作台：把服务端入口插入 Harness 插件树。
+# root 指向 DSH 数据目录下的 academic-lab，保存数据集索引、运行台账、图表产物。
+- insert:
+    - id: dsh-academic-lab
+      name: dsh-academic-lab
+      config:
+        root: !!js dshHomePath('academic-lab')

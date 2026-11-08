@@ -1,0 +1,75 @@
+"""CLI 入口：宿主进程只负责传 JSON，分析和出图全部在这里发生。
+
+调用约定（宿主 dsh/index.js 与我自己的测试都走这一条路）：
+    python3 lab_runner.py <payload.json>
+    # 或者从 stdin 读
+    echo '{...}' | python3 lab_runner.py -
+
+payload: {"command": "profile" | "stats" | "figure", "path": "...", "spec": {...}, "outDir": "...", "stem": "..."}
+stdout: 单个 JSON 对象；非零退出码表示失败，错误同样是 JSON。
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from lab_common import LabError, emit, jsonable, run_guarded  # noqa: E402
+
+
+def main() -> None:
+    if len(sys.argv) < 2:
+        emit({"ok": False, "error": {"code": "usage", "message": "用法：lab_runner.py <payload.json|->", "hint": ""}})
+        sys.exit(1)
+
+    source = sys.argv[1]
+    try:
+        if source == "-":
+            payload = json.load(sys.stdin)
+        else:
+            payload = json.loads(Path(source).read_text(encoding="utf-8"))
+    except Exception as error:  # noqa: BLE001
+        emit({"ok": False, "error": {"code": "bad-payload", "message": f"payload 不是合法 JSON：{error}", "hint": ""}})
+        sys.exit(1)
+
+    command = str(payload.get("command") or "").lower()
+    path = payload.get("path")
+    if not path:
+        emit({"ok": False, "error": {"code": "missing-path", "message": "payload 缺 path", "hint": "传数据文件的绝对路径"}})
+        sys.exit(1)
+
+    if command == "profile":
+        from lab_profile import build_profile
+
+        run_guarded(command, lambda: build_profile(path))
+    elif command == "stats":
+        from lab_stats import analyze
+
+        spec = payload.get("spec") or {}
+        run_guarded(command, lambda: analyze(path, spec))
+    elif command == "figure":
+        from lab_figure import make_figure
+
+        spec = payload.get("spec") or {}
+        out_dir = payload.get("outDir") or str(Path(path).resolve().parent / "figures")
+        stem = payload.get("stem") or "figure"
+        run_guarded(command, lambda: make_figure(path, spec, out_dir, stem))
+    else:
+        emit(
+            {
+                "ok": False,
+                "error": {
+                    "code": "unknown-command",
+                    "message": f"不认识的命令：{command or '（空）'}",
+                    "hint": "可用：profile / stats / figure",
+                },
+            }
+        )
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

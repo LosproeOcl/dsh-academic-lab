@@ -3,6 +3,7 @@
  * 打包前检查：files 清单是否齐全、有没有越界路径、体积是否超限。
  * 不替代 DSH 的安装校验，只保证 pnpm pack 产出的 tgz 里确实有该有的东西。
  */
+import { readdirSync, statSync } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
@@ -22,9 +23,15 @@ let total = 0
 for (const entry of files) {
   try {
     const info = await stat(join(ROOT, entry))
-    total += info.isFile() ? info.size : 0
-    if (!info.isFile()) fail(`${entry} 不是文件`)
-    else console.log(`  ✓ ${entry}（${(info.size / 1024).toFixed(1)} KB）`)
+    if (info.isDirectory()) {
+      const names = readdirSync(join(ROOT, entry))
+      if (!names.length) fail(`${entry}/ 是空目录`)
+      else console.log(`  ✓ ${entry}/（${names.length} 项）`)
+      for (const name of names) total += statSync(join(ROOT, entry, name)).size
+      continue
+    }
+    total += info.size
+    console.log(`  ✓ ${entry}（${(info.size / 1024).toFixed(1)} KB）`)
   } catch {
     fail(`${entry} 不存在`)
   }

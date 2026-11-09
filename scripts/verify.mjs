@@ -68,6 +68,11 @@ check('客户端有出图表单', client.includes('runFigure') && client.include
 const figurePy = await readFile(join(ROOT, 'py', 'lab_figure.py'), 'utf8')
 check('引擎有交互视图发射', figurePy.includes('_interactive_data') && figurePy.includes('emit_interactive_html') && figurePy.includes('.interactive.html'))
 check('客户端有交互视图入口', client.includes('figureInteractive') && client.includes('iframe') && client.includes("endsWith('.html')"))
+const describePy = await readFile(join(ROOT, 'py', 'lab_describe.py'), 'utf8')
+check('引擎有饱和描述模块', describePy.includes('def build_description') && describePy.includes('论文图注'))
+check('出图引擎接入描述', figurePy.includes('build_description') && figurePy.includes('"description"') && figurePy.includes('"prompt"'))
+check('服务端把描述写进台账', entry.includes('description: data.description') && entry.includes('prompt: data.prompt'))
+check('客户端展示描述与复制 prompt', client.includes('figureDescription') && client.includes('figureCopyPrompt') && client.includes('figResult.description') && client.includes('figResult.prompt'))
 check('数据目录用 dshHomePath', (await readFile(join(ROOT, 'cordis.patch.yml'), 'utf8')).includes("dshHomePath('academic-lab')"))
 
 console.log('2) Python 依赖探测')
@@ -146,6 +151,8 @@ if (figure.ok) {
   const html = files.find((item) => item.format === 'html')
   check('产出交互 HTML', Boolean(html && existsSync(html.path)), html?.path || 'missing')
   check('图注带数据指纹', String(figure.caption || '').includes('sha256'))
+  check('figure 带饱和描述', typeof figure.description === 'string' && figure.description.includes('本图为'), String(figure.description))
+  check('figure 带预制 prompt', typeof figure.prompt === 'string' && figure.prompt.includes('论文图注'), String(figure.prompt).slice(0, 80))
 }
 
 const scatter = await engine({

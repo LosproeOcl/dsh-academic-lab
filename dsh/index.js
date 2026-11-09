@@ -595,6 +595,8 @@ export function apply(ctx, config) {
         files: data.files.map((file) => file.path),
         copies: [],
         caption: data.caption,
+        description: data.description,
+        prompt: data.prompt,
         warnings: data.warnings
       }
       await saveRun(root, run)
@@ -830,6 +832,8 @@ export function apply(ctx, config) {
         files: data.files.map((file) => file.path),
         copies,
         caption: data.caption,
+        description: data.description,
+        prompt: data.prompt,
         warnings: data.warnings
       }
       await saveRun(root, run)
@@ -848,6 +852,9 @@ export function apply(ctx, config) {
         copiesList,
         '',
         `图注草稿：${data.caption}`,
+        '',
+        `饱和描述：${data.description || ''}`,
+        data.prompt ? `\n预制 prompt（可让 Agent 继续润色图注）：\n${data.prompt}` : '',
         data.warnings?.length ? `\n注意：\n${bulletList(data.warnings)}` : '',
         '',
         `— 运行记录 ${runId}（数据指纹 ${hash.slice(0, 12)}…）`

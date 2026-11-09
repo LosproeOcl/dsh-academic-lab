@@ -28,6 +28,7 @@ from matplotlib import font_manager  # noqa: E402
 from scipy import stats as sps  # noqa: E402
 
 from lab_common import LabError, load_table, numeric_frame, round_sig  # noqa: E402
+from lab_describe import build_description  # noqa: E402
 
 MM_PER_INCH = 25.4
 
@@ -958,7 +959,7 @@ def make_figure(path: str, spec: dict[str, Any], out_dir: str, stem: str) -> dic
         ]
     )
 
-    return {
+    result = {
         "ok": True,
         "chart": spec.get("chart"),
         "journal": JOURNALS.get(str(spec.get("journal") or "nature").lower(), {}).get("label"),
@@ -976,6 +977,11 @@ def make_figure(path: str, spec: dict[str, Any], out_dir: str, stem: str) -> dic
             "图注要写清 n、误差棒含义、统计方法；这里已生成草稿，正文还要补单位与来源。",
         ],
     }
+    # 学术化饱和描述 + 预制 prompt：出图即产出，供面板展示、供 Agent 继续润色图注。
+    desc = build_description(spec, result)
+    result["description"] = desc["description"]
+    result["prompt"] = desc["prompt"]
+    return result
 
 
 def jsonable_n(value: Any) -> str:

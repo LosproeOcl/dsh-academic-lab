@@ -107,7 +107,7 @@ figures/<runId>/     # figure 类型运行的 pdf/svg/png
 ## 7. 分期计划（决策已确认，逐期单独验收）
 
 - **P0 数据入口 + 审计**：`GET /candidates` + `POST /ingest` + `POST /audit`；数据卡片列表 + 审计详情页。
-  - P0.0 先验证：面板如何安全拿到「工作区目录路径」用于枚举数据文件（宿主 `service` 暴露的 workspace 项是否含 `path`）。若不可得，回退为「只枚举数据目录 + 登记时复制引用」，并回写设计。
+  - P0.0 已验证：工作台 `service` 的 workspace 列表只暴露 `workspaceId/title/sessionIds`，**不含磁盘路径**；宿主无 `pickFile`（`pickDirectory` 仅内部用）。因此 D2 落为两条入口：① 数据目录 `inbox/` 投放箱（面板点选）；② 粘贴绝对路径（GUI 标题栏可见 / Finder 复制）。两条都走同一 `ingest`，与 Agent 的 `lab_ingest` 同源。
 - **P1 统计表单**：`POST /stats` + 结果卡渲染。
 - **P2 出图表单**：`POST /figure` + 静态预览/下载；随后 P2b 交互视图（见 requirements.md §11）。
 - **P3 台账增强**：筛选、单次回看、复现说明。

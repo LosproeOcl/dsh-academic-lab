@@ -562,6 +562,57 @@ export function apply(ctx, config) {
       return jsonResponse({ ok: true, run })
     }))
 
+    // ---------------------------------------------- 出版级出图（面板自服务）--
+    // 与 Agent 的 lab_figure 同源：同一引擎、同一 outDir 结构、同一台账。
+    register(route('figure', ['POST'], async (request) => {
+      let body = {}
+      try { body = await request.json() } catch { body = {} }
+      const dataset = await getDataset(root, body?.datasetId)
+      const stem = slugify(String(body?.title || `${dataset.id}-${body?.chart || 'figure'}`))
+      const runId = shortId('fig')
+      const outDir = join(root, 'figures', runId)
+      const spec = {
+        chart: body?.chart,
+        x: body?.x,
+        y: body?.y,
+        group: body?.group,
+        journal: body?.journal || 'nature',
+        widthMm: body?.widthMm,
+        heightMm: body?.heightMm,
+        error: body?.error || 'ci95',
+        title: body?.title,
+        xLabel: body?.xLabel,
+        yLabel: body?.yLabel,
+        caption: body?.caption,
+        columns: body?.columns
+      }
+      const hash = await sha256File(dataset.path)
+      const startedAt = nowIso()
+      const { data, python } = await runEngine(root, config.python, {
+        command: 'figure',
+        path: dataset.path,
+        spec,
+        outDir,
+        stem
+      })
+      const run = {
+        id: runId,
+        kind: 'figure',
+        startedAt,
+        finishedAt: nowIso(),
+        datasetId: dataset.id,
+        dataset: { path: dataset.path, sha256: hash },
+        spec,
+        python,
+        files: data.files.map((file) => file.path),
+        copies: [],
+        caption: data.caption,
+        warnings: data.warnings
+      }
+      await saveRun(root, run)
+      return jsonResponse({ ok: true, run })
+    }))
+
     return () => {
       for (const dispose of disposers) {
         if (typeof dispose === 'function') dispose()

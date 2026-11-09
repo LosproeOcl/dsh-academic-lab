@@ -59,6 +59,8 @@ check('数据入口路由存在', entry.includes("'candidates'") && entry.includ
 check('客户端有数据入口', client.includes('doIngest') && client.includes('/candidates'))
 check('统计路由存在', entry.includes("'stats'") && entry.includes("command: 'stats'"))
 check('客户端有统计表单', client.includes('runStats') && client.includes('/stats') && client.includes('statAnalysis'))
+check('出图路由存在', entry.includes("'figure'") && entry.includes("command: 'figure'"))
+check('客户端有出图表单', client.includes('runFigure') && client.includes('/figure') && client.includes('figChart'))
 check('数据目录用 dshHomePath', (await readFile(join(ROOT, 'cordis.patch.yml'), 'utf8')).includes("dshHomePath('academic-lab')"))
 
 console.log('2) Python 依赖探测')

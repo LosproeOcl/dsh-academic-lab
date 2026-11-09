@@ -5,7 +5,8 @@
     # 或者从 stdin 读
     echo '{...}' | python3 lab_runner.py -
 
-payload: {"command": "profile" | "stats" | "figure", "path": "...", "spec": {...}, "outDir": "...", "stem": "..."}
+payload: {"command": "profile" | "stats" | "figure" | "gallery" | "recommend", "path": "...", "spec": {...}, "outDir": "...", "stem": "..."}
+gallery / recommend 不需要 path。
 stdout: 单个 JSON 对象；非零退出码表示失败，错误同样是 JSON。
 """
 
@@ -36,6 +37,21 @@ def main() -> None:
         sys.exit(1)
 
     command = str(payload.get("command") or "").lower()
+
+    # 图库与判读不需要读数据文件，放在 path 守卫之前处理。
+    if command == "gallery":
+        from lab_gallery import build_gallery
+
+        run_guarded(command, build_gallery)
+        return
+    if command == "recommend":
+        from lab_gallery import recommend
+
+        profile = payload.get("profile") or {}
+        question = str(payload.get("question") or "")
+        run_guarded(command, lambda: recommend(profile, question))
+        return
+
     path = payload.get("path")
     if not path:
         emit({"ok": False, "error": {"code": "missing-path", "message": "payload 缺 path", "hint": "传数据文件的绝对路径"}})
@@ -64,7 +80,7 @@ def main() -> None:
                 "error": {
                     "code": "unknown-command",
                     "message": f"不认识的命令：{command or '（空）'}",
-                    "hint": "可用：profile / stats / figure",
+                    "hint": "可用：profile / stats / figure / gallery / recommend",
                 },
             }
         )

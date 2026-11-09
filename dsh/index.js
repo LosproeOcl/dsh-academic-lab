@@ -523,44 +523,31 @@ export function apply(ctx, config) {
       return jsonResponse({ ok: true, id, record })
     }))
 
-    // ---------------------------------------------- 统计推断（面板自服务）--
-    // 面板把表单参数原样交给同一个引擎/同一个台账，与 Agent 的 lab_stats 同源，
-    // 不会出现「面板算一遍、会话里再算一遍」结果对不上的情况。
-    register(route('stats', ['POST'], async (request) => {
-      let body = {}
-      try { body = await request.json() } catch { body = {} }
-      const dataset = await getDataset(root, body?.datasetId)
-      const spec = {
-        analysis: String(body?.analysis || ''),
-        dv: body?.dv,
-        group: body?.group,
-        x: body?.x,
-        y: body?.y,
-        predictors: body?.predictors,
-        columns: body?.columns,
-        dvs: body?.dv,
-        method: body?.method,
-        correction: body?.correction,
-        robust: body?.robust,
-        alpha: body?.alpha
+    // ---------------------------------------------- 图库（面板自服务）--
+    // 每种图型一张示例板，讲清是什么 / 解决什么问题 / 数据要什么 / 怎么读 /
+    // 常见误用。纯元数据，不读数据文件，直接由引擎返回。
+    register(route('gallery', ['GET'], async () => {
+      const { data } = await runEngine(root, config.python, { command: 'gallery' })
+      return jsonResponse(data)
+    }))
+
+    // ---------------------------------------------- 选图判读（面板自服务）--
+    // 拿到数据画像 + 一句「我想看什么」，引擎返回该画哪种图、用哪些列、为什么。
+    // 推荐的 spec 可直接交给下方 /figure 出图。
+    register(route('recommend', ['GET'], async (request) => {
+      const url = new URL(request.url)
+      const question = (url.searchParams.get('question') || '').trim()
+      const datasetId = (url.searchParams.get('datasetId') || '').trim()
+      if (!datasetId) {
+        return jsonResponse({ ok: true, recommendations: [], hint: '先登记一个数据集，再判读该画什么图。' })
       }
-      const hash = await sha256File(dataset.path)
-      const startedAt = nowIso()
-      const { data, python } = await runEngine(root, config.python, { command: 'stats', path: dataset.path, spec })
-      const run = {
-        id: shortId('run'),
-        kind: 'stats',
-        startedAt,
-        finishedAt: nowIso(),
-        datasetId: dataset.id,
-        dataset: { path: dataset.path, sha256: hash },
-        spec,
-        python,
-        result: data,
-        headline: data.sentence || (data.reading || [])[0] || ''
-      }
-      await saveRun(root, run)
-      return jsonResponse({ ok: true, run })
+      const dataset = await getDataset(root, datasetId)
+      const { data } = await runEngine(root, config.python, {
+        command: 'recommend',
+        profile: dataset.profile || {},
+        question
+      })
+      return jsonResponse(data)
     }))
 
     // ---------------------------------------------- 出版级出图（面板自服务）--
@@ -901,7 +888,50 @@ export function apply(ctx, config) {
     }
   }))
 
-  console.log('[dsh-academic-lab] 已注册工具：lab_datasets / lab_ingest / lab_profile / lab_stats / lab_figure / lab_runs / lab_run')
+  register(defineTool({
+    name: 'lab_gallery',
+    description: 'List the chart types this workbench can draw (the gallery): each entry explains what the chart is, when to use it, what data it needs, how to read it, and common pitfalls. Call this before lab_figure or lab_recommend to pick the right chart.',
+    parameters: {},
+    output: textOutput(),
+    async execute() {
+      const { data } = await runEngine(root, config.python, { command: 'gallery' })
+      const lines = []
+      for (const category of data.categories || []) {
+        lines.push(`# ${category.name}（${category.name_en}）`)
+        for (const item of category.items) {
+          lines.push(`- ${item.name}（${item.name_en}）：${item.summary}`)
+        }
+      }
+      return lines.join('\n')
+    }
+  }))
+
+  register(defineTool({
+    name: 'lab_recommend',
+    description: 'Given a registered dataset and a one-line research question (what the user wants to see: compare groups / trend / distribution / correlation / composition / overview), recommend which charts to draw and with which columns. Returns a ranked list with concrete specs you can pass straight to lab_figure.',
+    parameters: {
+      datasetId: { type: 'string', required: true, description: 'Dataset id from lab_datasets.' },
+      question: { type: 'string', required: true, description: 'What the user wants to see, e.g. 比较组间差异 / 看趋势 / 看分布 / 看两变量关系 / 占比 / 概览.' }
+    },
+    output: textOutput(),
+    async execute(args) {
+      const dataset = await getDataset(root, args?.datasetId)
+      const { data } = await runEngine(root, config.python, {
+        command: 'recommend',
+        profile: dataset.profile || {},
+        question: String(args?.question || '')
+      })
+      if (!(data.recommendations || []).length) {
+        return data.hint || '没有可推荐的图。'
+      }
+      const lines = data.recommendations.map((rec) =>
+        `- [置信 ${rec.confidence}] ${rec.name || rec.chart_id}：${rec.reason}\n  参数：${JSON.stringify(rec.spec || {})}`
+      )
+      return `意图：${data.intent}\n${lines.join('\n')}`
+    }
+  }))
+
+  console.log('[dsh-academic-lab] 已注册工具：lab_datasets / lab_ingest / lab_profile / lab_stats / lab_figure / lab_runs / lab_run / lab_gallery / lab_recommend')
   console.log(`[dsh-academic-lab] 数据目录：${root}`)
 
   ctx.systemPrompt.section({
@@ -909,7 +939,8 @@ export function apply(ctx, config) {
     order: 132,
     text: [
       'DSH academic data workbench: the user\'s data files live in the workspace; analysis and publication figures run through this workbench.',
-      'Workflow: lab_ingest (absolute path) → read the audit warnings → lab_stats → lab_figure → report with effect sizes, CIs, n and the run id.',
+      'Workflow: lab_ingest (absolute path) → read the audit warnings → lab_recommend (dataset + one-line question) to pick charts → lab_figure to render → report with effect sizes, CIs, n and the run id.',
+      'Use lab_gallery to see every supported chart and what it is for; use lab_recommend to turn a vague question ("compare groups", "distribution", "correlation") into concrete chart + column specs.',
       'Prefer lab_stats over ad-hoc python for inferential statistics: it returns effect sizes, 95% CIs, assumption checks and Holm/BH correction, and records provenance.',
       'Never claim a p value or effect size that lab_stats did not return; if the engine reports warnings (missingness, duplicates, small n, heteroscedasticity), surface them in the answer instead of hiding them.',
       'lab_figure writes PDF/SVG/PNG at journal column widths; cite the journal preset and the caption draft, and keep the n and units in the caption.',

@@ -57,8 +57,12 @@ check('服务端声明 inject', entry.includes("export const inject = ['connecti
 check('路由登记包在 effect 内', entry.includes("'academic-lab: api routes'"))
 check('数据入口路由存在', entry.includes("'candidates'") && entry.includes("'ingest'"))
 check('客户端有数据入口', client.includes('doIngest') && client.includes('/candidates'))
-check('统计路由存在', entry.includes("'stats'") && entry.includes("command: 'stats'"))
-check('客户端有统计表单', client.includes('runStats') && client.includes('/stats') && client.includes('statAnalysis'))
+check('图库路由存在', entry.includes("'gallery'") && entry.includes("command: 'gallery'"))
+check('判读路由存在', entry.includes("'recommend'") && entry.includes("command: 'recommend'"))
+check('客户端有图库区', client.includes('gallerySection') && client.includes('/gallery') && client.includes('galleryOpen'))
+check('客户端有判读区', client.includes('recommendSection') && client.includes('runRecommend') && client.includes('/recommend'))
+check('客户端已移除统计表单', !client.includes('runStats') && !client.includes('/stats'))
+check('lab_stats 工具保留（Agent 路径）', entry.includes("'lab_stats'"))
 check('出图路由存在', entry.includes("'figure'") && entry.includes("command: 'figure'"))
 check('客户端有出图表单', client.includes('runFigure') && client.includes('/figure') && client.includes('figChart'))
 const figurePy = await readFile(join(ROOT, 'py', 'lab_figure.py'), 'utf8')
@@ -106,6 +110,22 @@ check('regress 返回 ok', regress.ok === true, JSON.stringify(regress.error))
 if (regress.ok) {
   check('robust 标准误', regress.robust === true, String(regress.robust))
   check('系数含 CI', Array.isArray(regress.coefficients) && Array.isArray(regress.coefficients[0]?.ci95))
+}
+
+console.log('4b) 图库与判读')
+const gallery = await engine({ command: 'gallery' })
+check('gallery 返回 ok', gallery.ok === true, JSON.stringify(gallery.error))
+if (gallery.ok) {
+  check('图库 12 张示例板', gallery.total === 12, String(gallery.total))
+  check('图库分 6 类', Array.isArray(gallery.categories) && gallery.categories.length === 6, String(gallery.categories?.length))
+  check('每张板有定义与误用', (gallery.categories || []).every((cat) => (cat.items || []).every((item) => item.definition && item.pitfalls)))
+}
+const recommend = await engine({ command: 'recommend', profile, question: 'compare' })
+check('recommend 返回 ok', recommend.ok === true, JSON.stringify(recommend.error))
+if (recommend.ok) {
+  check('recommend 给出推荐', Array.isArray(recommend.recommendations) && recommend.recommendations.length > 0)
+  check('推荐带 spec.chart', Boolean(recommend.recommendations?.[0]?.spec?.chart), JSON.stringify(recommend.recommendations?.[0]?.spec))
+  check('推荐意图为 compare', recommend.intent === 'compare', String(recommend.intent))
 }
 
 console.log('5) 出版级出图')

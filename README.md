@@ -79,6 +79,12 @@ node scripts/check-package.mjs # 打包清单检查
 
 MIT。
 
+## 面板布局
+
+工作台按「整页 + 按需会话」注册（`customFrame: true`）：数据集、图表和运行台账占满主内容区，
+需要 AI 协助时点右上角「AI 协助」，宿主原生会话以右侧抽屉形式出现，收起后回到整页视图。
+会话只在用户点击时创建或恢复，不常驻、不占宽度。
+
 ## 示例产物
 
 `examples/out/` 里是用 `examples/trial.csv` 跑出来的四张图（Nature/Science/IEEE 栏宽）：

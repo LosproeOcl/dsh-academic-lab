@@ -522,6 +522,46 @@ export function apply(ctx, config) {
       return jsonResponse({ ok: true, id, record })
     }))
 
+    // ---------------------------------------------- 统计推断（面板自服务）--
+    // 面板把表单参数原样交给同一个引擎/同一个台账，与 Agent 的 lab_stats 同源，
+    // 不会出现「面板算一遍、会话里再算一遍」结果对不上的情况。
+    register(route('stats', ['POST'], async (request) => {
+      let body = {}
+      try { body = await request.json() } catch { body = {} }
+      const dataset = await getDataset(root, body?.datasetId)
+      const spec = {
+        analysis: String(body?.analysis || ''),
+        dv: body?.dv,
+        group: body?.group,
+        x: body?.x,
+        y: body?.y,
+        predictors: body?.predictors,
+        columns: body?.columns,
+        dvs: body?.dv,
+        method: body?.method,
+        correction: body?.correction,
+        robust: body?.robust,
+        alpha: body?.alpha
+      }
+      const hash = await sha256File(dataset.path)
+      const startedAt = nowIso()
+      const { data, python } = await runEngine(root, config.python, { command: 'stats', path: dataset.path, spec })
+      const run = {
+        id: shortId('run'),
+        kind: 'stats',
+        startedAt,
+        finishedAt: nowIso(),
+        datasetId: dataset.id,
+        dataset: { path: dataset.path, sha256: hash },
+        spec,
+        python,
+        result: data,
+        headline: data.sentence || (data.reading || [])[0] || ''
+      }
+      await saveRun(root, run)
+      return jsonResponse({ ok: true, run })
+    }))
+
     return () => {
       for (const dispose of disposers) {
         if (typeof dispose === 'function') dispose()

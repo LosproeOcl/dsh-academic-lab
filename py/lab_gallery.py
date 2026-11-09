@@ -28,8 +28,8 @@ from typing import Any
 #   data        数据要求
 #   read        怎么读
 #   pitfalls    常见误用
-#   engine      绘制方式；None 表示绘制尚未接入（信息图在后续阶段）
-#   requires    需要的列尺度（x/y/group 的取值，供表单提示）
+#   engine      绘制方式：{"command":"figure","chart":X} 学术图 | {"command":"infographic","type":X} 信息图
+#   requires    需要的列尺度或 data 格式（供表单 / Agent 提示）
 
 GALLERY: list[dict[str, Any]] = [
     {
@@ -212,8 +212,8 @@ GALLERY: list[dict[str, Any]] = [
             "数字要给单位与口径",
             "别把不相关的指标并列制造虚假因果联想",
         ],
-        "engine": None,
-        "requires": None,
+        "engine": {"command": "infographic", "type": "stats"},
+        "requires": {"data": "label + value + icon（可选 trend/trend_dir）键值对"},
     },
     {
         "id": "comparison",
@@ -232,8 +232,8 @@ GALLERY: list[dict[str, Any]] = [
             "别用 3D 柱",
             "项目顺序按值排能更快读",
         ],
-        "engine": None,
-        "requires": None,
+        "engine": {"command": "infographic", "type": "comparison"},
+        "requires": {"data": "categories + series（name + values）"},
     },
     {
         "id": "flow",
@@ -252,8 +252,8 @@ GALLERY: list[dict[str, Any]] = [
             "分支条件写清楚",
             "不要双向箭头让读者不知道方向",
         ],
-        "engine": None,
-        "requires": None,
+        "engine": {"command": "infographic", "type": "flow"},
+        "requires": {"data": "step + title + description（+icon）步骤列表"},
     },
     {
         "id": "dashboard",
@@ -272,8 +272,8 @@ GALLERY: list[dict[str, Any]] = [
             "每个模块要有清晰标题",
             "配色统一",
         ],
-        "engine": None,
-        "requires": None,
+        "engine": {"command": "infographic", "type": "dashboard"},
+        "requires": {"data": "stats + chart + breakdown + flow 四模块"},
     },
 ]
 

@@ -73,6 +73,12 @@ check('引擎有饱和描述模块', describePy.includes('def build_description'
 check('出图引擎接入描述', figurePy.includes('build_description') && figurePy.includes('"description"') && figurePy.includes('"prompt"'))
 check('服务端把描述写进台账', entry.includes('description: data.description') && entry.includes('prompt: data.prompt'))
 check('客户端展示描述与复制 prompt', client.includes('figureDescription') && client.includes('figureCopyPrompt') && client.includes('figResult.description') && client.includes('figResult.prompt'))
+const infographicPy = await readFile(join(ROOT, 'py', 'lab_infographic.py'), 'utf8')
+check('信息图模块存在', infographicPy.includes('def render_infographic') && infographicPy.includes('build_infographic'))
+check('信息图路由存在', entry.includes("'infographic'") && entry.includes("command: 'infographic'"))
+check('信息图工具存在', entry.includes("'lab_infographic'"))
+check('客户端信息图入口', client.includes('galleryInfographic') && client.includes('copyInfographicPrompt') && client.includes("'infographic'"))
+check('信息图脚本已 vendor', existsSync(join(ROOT, 'py', 'build_infographic.py')))
 check('数据目录用 dshHomePath', (await readFile(join(ROOT, 'cordis.patch.yml'), 'utf8')).includes("dshHomePath('academic-lab')"))
 
 console.log('2) Python 依赖探测')
@@ -132,6 +138,32 @@ if (recommend.ok) {
   check('推荐带 spec.chart', Boolean(recommend.recommendations?.[0]?.spec?.chart), JSON.stringify(recommend.recommendations?.[0]?.spec))
   check('推荐意图为 compare', recommend.intent === 'compare', String(recommend.intent))
 }
+
+console.log('4c) 信息图')
+for (const [igType, data] of [
+  ['stats', [{ label: '样本量', value: '122', icon: 'users' }, { label: '分组', value: '3', icon: 'chart-bar' }]],
+  ['comparison', { chart_title: '分组均值', categories: ['对照', '低剂量', '高剂量'], series: [{ name: 'outcome_score', values: [3.1, 4.2, 5.0] }] }]
+]) {
+  const infographic = await engine({
+    command: 'infographic',
+    outDir: OUT,
+    stem: `verify-${igType}`,
+    spec: { title: '验证信息图', type: igType, data }
+  })
+  check(`infographic ${igType} 返回 ok`, infographic.ok === true, JSON.stringify(infographic.error))
+  if (infographic.ok) {
+    const html = (infographic.files || []).find((item) => item.format === 'html')
+    check(`infographic ${igType} 产出 HTML`, Boolean(html && existsSync(html.path)), html?.path || 'missing')
+    check(`infographic ${igType} 类型正确`, infographic.type === igType, String(infographic.type))
+  }
+}
+const infographicBad = await engine({
+  command: 'infographic',
+  outDir: OUT,
+  stem: 'verify-bad',
+  spec: { title: '坏配置', type: 'stats' }
+})
+check('infographic 坏配置被拒', infographicBad.ok === false, JSON.stringify(infographicBad.error))
 
 console.log('5) 出版级出图')
 const figure = await engine({

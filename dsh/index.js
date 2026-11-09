@@ -550,6 +550,40 @@ export function apply(ctx, config) {
       return jsonResponse(data)
     }))
 
+    // ------------------------------------------------ 信息图（AI 绘制为主）--
+    // config 由 Agent 按四类（stats/comparison/flow/dashboard）的 data 格式装配。
+    register(route('infographic', ['POST'], async (request) => {
+      let body = {}
+      try { body = await request.json() } catch { body = {} }
+      const stem = slugify(String(body?.title || body?.type || 'infographic'))
+      const runId = shortId('fig')
+      const outDir = join(root, 'figures', runId)
+      const { data, python } = await runEngine(root, config.python, {
+        command: 'infographic',
+        spec: body,
+        outDir,
+        stem
+      })
+      const run = {
+        id: runId,
+        kind: 'infographic',
+        startedAt: nowIso(),
+        finishedAt: nowIso(),
+        datasetId: null,
+        dataset: null,
+        spec: body,
+        python,
+        files: (data.files || []).map((file) => file.path),
+        copies: [],
+        caption: data.caption || '',
+        description: data.title ? `信息图「${data.title}」（${data.type}）` : '',
+        prompt: '',
+        warnings: []
+      }
+      await saveRun(root, run)
+      return jsonResponse({ ok: true, run })
+    }))
+
     // ---------------------------------------------- 出版级出图（面板自服务）--
     // 与 Agent 的 lab_figure 同源：同一引擎、同一 outDir 结构、同一台账。
     register(route('figure', ['POST'], async (request) => {
@@ -938,7 +972,44 @@ export function apply(ctx, config) {
     }
   }))
 
-  console.log('[dsh-academic-lab] 已注册工具：lab_datasets / lab_ingest / lab_profile / lab_stats / lab_figure / lab_runs / lab_run / lab_gallery / lab_recommend')
+  register(defineTool({
+    name: 'lab_infographic',
+    description: 'Render a self-contained HTML/SVG infographic from a JSON config (vendored MIT data-viz-gen builder, zero dependency). Four types: stats (KPI stat cards), comparison (grouped bar chart), flow (step diagram), dashboard (mixed layout). Pass `config` as a JSON string. Returns the HTML file path; the panel and the figures directory show it.',
+    parameters: {
+      config: { type: 'string', required: true, description: 'JSON string of the infographic config {title, subtitle?, type: stats|comparison|flow|dashboard, palette?, data, footer?}. data formats: stats=[{label,value,icon,trend,trend_dir}]; comparison={chart_title,categories,series:[{name,values}]}; flow=[{step,title,description,icon}]; dashboard={stats,chart,breakdown,flow}. palette: auto|ocean|sunset|forest|berry|vibrant|corporate|pastel|earth.' }
+    },
+    output: textOutput(),
+    async execute(args) {
+      let cfg = {}
+      try { cfg = JSON.parse(String(args?.config || '{}')) } catch { throw new LabError('config 不是合法 JSON。') }
+      const stem = slugify(String(cfg?.title || cfg?.type || 'infographic'))
+      const runId = shortId('fig')
+      const outDir = join(root, 'figures', runId)
+      const { data, python } = await runEngine(root, config.python, {
+        command: 'infographic', spec: cfg, outDir, stem
+      })
+      const run = {
+        id: runId,
+        kind: 'infographic',
+        startedAt: nowIso(),
+        finishedAt: nowIso(),
+        datasetId: null,
+        dataset: null,
+        spec: cfg,
+        python,
+        files: (data.files || []).map((file) => file.path),
+        copies: [],
+        caption: data.caption || '',
+        description: data.title ? `信息图「${data.title}」（${data.type}）` : '',
+        prompt: '',
+        warnings: []
+      }
+      await saveRun(root, run)
+      return `已生成信息图（${data.type}${data.title ? `：${data.title}` : ''}）。\n文件：${(data.files || []).map((file) => file.path).join(', ')}`
+    }
+  }))
+
+  console.log('[dsh-academic-lab] 已注册工具：lab_datasets / lab_ingest / lab_profile / lab_stats / lab_figure / lab_runs / lab_run / lab_gallery / lab_recommend / lab_infographic')
   console.log(`[dsh-academic-lab] 数据目录：${root}`)
 
   ctx.systemPrompt.section({
@@ -948,6 +1019,7 @@ export function apply(ctx, config) {
       'DSH academic data workbench: the user\'s data files live in the workspace; analysis and publication figures run through this workbench.',
       'Workflow: lab_ingest (absolute path) → read the audit warnings → lab_recommend (dataset + one-line question) to pick charts → lab_figure to render → report with effect sizes, CIs, n and the run id.',
       'Use lab_gallery to see every supported chart and what it is for; use lab_recommend to turn a vague question ("compare groups", "distribution", "correlation") into concrete chart + column specs.',
+      'For infographic-style deliverables (KPI stat cards, comparison bars, flow diagrams, dashboards), use lab_infographic with a JSON config instead of lab_figure.',
       'Prefer lab_stats over ad-hoc python for inferential statistics: it returns effect sizes, 95% CIs, assumption checks and Holm/BH correction, and records provenance.',
       'Never claim a p value or effect size that lab_stats did not return; if the engine reports warnings (missingness, duplicates, small n, heteroscedasticity), surface them in the answer instead of hiding them.',
       'lab_figure writes PDF/SVG/PNG at journal column widths; cite the journal preset and the caption draft, and keep the n and units in the caption.',

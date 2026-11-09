@@ -5,8 +5,8 @@
     # 或者从 stdin 读
     echo '{...}' | python3 lab_runner.py -
 
-payload: {"command": "profile" | "stats" | "figure" | "gallery" | "recommend", "path": "...", "spec": {...}, "outDir": "...", "stem": "..."}
-gallery / recommend 不需要 path。
+payload: {"command": "profile" | "stats" | "figure" | "gallery" | "recommend" | "infographic", "path": "...", "spec": {...}, "outDir": "...", "stem": "..."}
+gallery / recommend / infographic 不需要 path。
 stdout: 单个 JSON 对象；非零退出码表示失败，错误同样是 JSON。
 """
 
@@ -51,6 +51,14 @@ def main() -> None:
         question = str(payload.get("question") or "")
         run_guarded(command, lambda: recommend(profile, question))
         return
+    if command == "infographic":
+        from lab_infographic import render_infographic
+
+        spec = payload.get("spec") or {}
+        out_dir = payload.get("outDir") or "."
+        stem = payload.get("stem") or "infographic"
+        run_guarded(command, lambda: render_infographic(spec, out_dir, stem))
+        return
 
     path = payload.get("path")
     if not path:
@@ -80,7 +88,7 @@ def main() -> None:
                 "error": {
                     "code": "unknown-command",
                     "message": f"不认识的命令：{command or '（空）'}",
-                    "hint": "可用：profile / stats / figure / gallery / recommend",
+                    "hint": "可用：profile / stats / figure / gallery / recommend / infographic",
                 },
             }
         )

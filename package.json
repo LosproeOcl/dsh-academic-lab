@@ -1,6 +1,6 @@
 {
   "name": "dsh-academic-lab",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "displayName": "DSH Academic Data Lab",
   "description": "DSH 学术数据工作台：数据审计、统计推断（效应量/置信区间/前提检查/多重比较校正）与出版级出图，每次分析写入可复现运行台账。",
   "type": "module",
@@ -21,9 +21,12 @@
     "py/lab_gallery.py",
     "py/lab_runner.py",
     "py/lab_describe.py",
+    "py/lab_infographic.py",
+    "py/build_infographic.py",
     "cordis.patch.yml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "license": "MIT",
   "author": "DSH Academic Data Lab",

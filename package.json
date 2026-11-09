@@ -1,6 +1,6 @@
 {
   "name": "dsh-academic-lab",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "displayName": "DSH Academic Data Lab",
   "description": "DSH 学术数据工作台：数据审计、统计推断（效应量/置信区间/前提检查/多重比较校正）与出版级出图，每次分析写入可复现运行台账。",
   "type": "module",

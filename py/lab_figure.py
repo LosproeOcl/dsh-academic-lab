@@ -881,7 +881,9 @@ def emit_interactive_html(payload: dict[str, Any], out_dir: str, stem: str) -> d
     if not payload:
         return None
     title = str(payload.get("title") or stem).replace("<", "&lt;").replace(">", "&gt;")
-    data_json = json.dumps(payload, ensure_ascii=False)
+    # 内嵌在 <script> 里的 JSON：把 <、>、& 转成 \u 序列，防止数据里的 "</script>"
+    # 之类内容提前闭合脚本标签（JSON.parse 会还原，无数据损失）。
+    data_json = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     html = (
         _INTERACTIVE_TEMPLATE
         .replace("__DATA__", data_json)

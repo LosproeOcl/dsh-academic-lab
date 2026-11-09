@@ -470,6 +470,58 @@ export function apply(ctx, config) {
       }
     }))
 
+    // ---------------------------------------------- 数据入口（面板自服务）--
+    // 面板没有宿主文件选择器（pickFile 在宿主协议里不存在），所以数据入口分成
+    // 两条：① 数据目录里的 inbox/ 投放箱，用户把文件放进来即可点选；② 粘贴一个
+    // 绝对路径（GUI 工作区标题栏能看到路径，或从 Finder 拖入复制）。两条都走
+    // 同一个 ingest，与 Agent 的 lab_ingest 共用引擎与台账。
+    register(route('candidates', ['GET'], async () => {
+      const inbox = join(root, 'inbox')
+      await mkdir(inbox, { recursive: true })
+      const names = await readdir(inbox)
+      const files = []
+      for (const file of names) {
+        const suffix = extname(file).toLowerCase()
+        if (!SUPPORTED_EXT.has(suffix)) continue
+        try {
+          const info = await stat(join(inbox, file))
+          if (info.isFile()) {
+            files.push({ name: file, path: join(inbox, file), size: info.size, mtime: info.mtimeMs })
+          }
+        } catch {
+          // 条目消失或不可读就跳过，不影响其余。
+        }
+      }
+      files.sort((a, b) => b.mtime - a.mtime)
+      return jsonResponse({ ok: true, inbox, files: files.slice(0, 500) })
+    }))
+
+    register(route('ingest', ['POST'], async (request) => {
+      let body = {}
+      try { body = await request.json() } catch { body = {} }
+      const file = await resolveDataPath(body?.path, root)
+      const hash = await sha256File(file)
+      const id = datasetIdFor(file, hash)
+      const existing = await readJsonFile(join(root, 'datasets', `${id}.json`))
+      if (existing?.profile && existing.sha256 === hash) {
+        return jsonResponse({ ok: true, id, record: existing, cached: true })
+      }
+      const { data } = await runEngine(root, config.python, { command: 'profile', path: file })
+      const record = {
+        id,
+        name: String(body?.name || basename(file)),
+        path: file,
+        sha256: hash,
+        rows: data.shape.rows,
+        columns: data.shape.columns,
+        registeredAt: existing?.registeredAt || nowIso(),
+        auditedAt: nowIso(),
+        profile: data
+      }
+      await writeJsonFile(join(root, 'datasets', `${id}.json`), record)
+      return jsonResponse({ ok: true, id, record })
+    }))
+
     return () => {
       for (const dispose of disposers) {
         if (typeof dispose === 'function') dispose()

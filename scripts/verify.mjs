@@ -55,6 +55,8 @@ check('客户端注册工作台', client.includes('desktopWorkbenches.register('
 const entry = await readFile(join(ROOT, 'dsh', 'index.js'), 'utf8')
 check('服务端声明 inject', entry.includes("export const inject = ['connection', 'tools', 'systemPrompt']"))
 check('路由登记包在 effect 内', entry.includes("'academic-lab: api routes'"))
+check('数据入口路由存在', entry.includes("'candidates'") && entry.includes("'ingest'"))
+check('客户端有数据入口', client.includes('doIngest') && client.includes('/candidates'))
 check('数据目录用 dshHomePath', (await readFile(join(ROOT, 'cordis.patch.yml'), 'utf8')).includes("dshHomePath('academic-lab')"))
 
 console.log('2) Python 依赖探测')

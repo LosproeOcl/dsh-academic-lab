@@ -61,6 +61,9 @@ check('统计路由存在', entry.includes("'stats'") && entry.includes("command
 check('客户端有统计表单', client.includes('runStats') && client.includes('/stats') && client.includes('statAnalysis'))
 check('出图路由存在', entry.includes("'figure'") && entry.includes("command: 'figure'"))
 check('客户端有出图表单', client.includes('runFigure') && client.includes('/figure') && client.includes('figChart'))
+const figurePy = await readFile(join(ROOT, 'py', 'lab_figure.py'), 'utf8')
+check('引擎有交互视图发射', figurePy.includes('_interactive_data') && figurePy.includes('emit_interactive_html') && figurePy.includes('.interactive.html'))
+check('客户端有交互视图入口', client.includes('figureInteractive') && client.includes('iframe') && client.includes("endsWith('.html')"))
 check('数据目录用 dshHomePath', (await readFile(join(ROOT, 'cordis.patch.yml'), 'utf8')).includes("dshHomePath('academic-lab')"))
 
 console.log('2) Python 依赖探测')
@@ -120,6 +123,8 @@ if (figure.ok) {
     const file = files.find((item) => item.format === format)
     check(`产出 ${format.toUpperCase()}`, Boolean(file && existsSync(file.path)), file?.path || 'missing')
   }
+  const html = files.find((item) => item.format === 'html')
+  check('产出交互 HTML', Boolean(html && existsSync(html.path)), html?.path || 'missing')
   check('图注带数据指纹', String(figure.caption || '').includes('sha256'))
 }
 

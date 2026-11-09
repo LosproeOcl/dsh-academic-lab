@@ -459,7 +459,8 @@ export function apply(ctx, config) {
           '.png': 'image/png',
           '.svg': 'image/svg+xml',
           '.pdf': 'application/pdf',
-          '.json': 'application/json'
+          '.json': 'application/json',
+          '.html': 'text/html; charset=utf-8'
         }
         return new Response(payload, {
           status: 200,
